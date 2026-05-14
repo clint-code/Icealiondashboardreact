@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Wallet, TrendingUp, FileCheck, DollarSign, Activity, CheckCircle2, ArrowUpCircle, ChevronLeft, ChevronRight, Search, Calendar, Plus, Loader2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Wallet, TrendingUp, FileCheck, DollarSign, Activity, CheckCircle2, ArrowUpCircle, ChevronLeft, ChevronRight, Search, Calendar, Plus, Loader2, X } from 'lucide-react';
 import { StatsCard } from './StatsCard';
 import { RequestTopUpModal } from './RequestTopUpModal';
 import { Toast } from './Toast';
@@ -19,6 +20,7 @@ interface DashboardViewProps {
 }
 
 export function DashboardView({ userRole }: DashboardViewProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -27,12 +29,14 @@ export function DashboardView({ userRole }: DashboardViewProps) {
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [startDate, setStartDate] = useState(searchParams.get('startDate') || '');
+  const [endDate, setEndDate] = useState(searchParams.get('endDate') || '');
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState(searchParams.get('division') || '');
   const [topUpDivision, setTopUpDivision] = useState<string | undefined>(undefined);
   const [nextTxnId, setNextTxnId] = useState(6);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
 
   // Fetch dashboard data from API
   useEffect(() => {
@@ -92,54 +96,127 @@ export function DashboardView({ userRole }: DashboardViewProps) {
     fetchDashboardData();
   }, [userRole]);
 
-  // Mock recent transactions - In production, fetch from API
-  const [allTransactions, setAllTransactions] = useState([
-    {
-      id: 'TXN001',
-      type: 'top_up' as const,
-      division: 'General Insurance',
-      amount: 500000,
-      date: '2026-04-15',
-      status: 'completed' as const,
-      reference: 'TOPUP-GI-20260415-001',
-    },
-    {
-      id: 'TXN002',
-      type: 'usage' as const,
-      division: 'General Insurance',
-      amount: -45000,
-      date: '2026-04-20',
-      status: 'completed' as const,
-      reference: 'USAGE-GI-20260420-142',
-    },
-    {
-      id: 'TXN003',
-      type: 'top_up' as const,
-      division: 'Asset Management',
-      amount: 400000,
-      date: '2026-04-10',
-      status: 'completed' as const,
-      reference: 'TOPUP-AM-20260410-001',
-    },
-    {
-      id: 'TXN004',
-      type: 'usage' as const,
-      division: 'Asset Management',
-      amount: -32000,
-      date: '2026-04-18',
-      status: 'completed' as const,
-      reference: 'USAGE-AM-20260418-089',
-    },
-    {
-      id: 'TXN005',
-      type: 'top_up' as const,
-      division: 'Asset Management',
-      amount: 300000,
-      date: '2026-05-05',
-      status: 'pending' as const,
-      reference: 'TOPUP-AM-20260505-001',
-    },
-  ]);
+  // Fetch transactions from API
+  const fetchTransactions = async (filters?: { search?: string; division?: string; startDate?: string; endDate?: string }) => {
+    setIsLoadingTransactions(true);
+
+    // Use provided filters or fall back to state
+    const search = filters?.search !== undefined ? filters.search : searchTerm;
+    const division = filters?.division !== undefined ? filters.division : selectedDivisionFilter;
+    const start = filters?.startDate !== undefined ? filters.startDate : startDate;
+    const end = filters?.endDate !== undefined ? filters.endDate : endDate;
+
+    try {
+      // Build query params for API call
+      const params = new URLSearchParams();
+      params.append('role', userRole);
+      if (search) params.append('search', search);
+      if (division) params.append('division', division);
+      if (start) params.append('startDate', start);
+      if (end) params.append('endDate', end);
+
+      // In production, replace this with actual API call:
+      // const response = await fetch(`/api/transactions?${params.toString()}`);
+      // const data = await response.json();
+      // setTransactions(data.transactions);
+
+      // Mock API call with timeout
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Mock data - in production this comes from API
+      const mockTransactions = [
+        {
+          id: 'TXN001',
+          type: 'top_up' as const,
+          division: 'General Insurance',
+          amount: 500000,
+          date: '2026-04-15',
+          status: 'completed' as const,
+          reference: 'TOPUP-GI-20260415-001',
+        },
+        {
+          id: 'TXN002',
+          type: 'usage' as const,
+          division: 'General Insurance',
+          amount: -45000,
+          date: '2026-04-20',
+          status: 'completed' as const,
+          reference: 'USAGE-GI-20260420-142',
+        },
+        {
+          id: 'TXN003',
+          type: 'top_up' as const,
+          division: 'Asset Management',
+          amount: 400000,
+          date: '2026-04-10',
+          status: 'completed' as const,
+          reference: 'TOPUP-AM-20260410-001',
+        },
+        {
+          id: 'TXN004',
+          type: 'usage' as const,
+          division: 'Asset Management',
+          amount: -32000,
+          date: '2026-04-18',
+          status: 'completed' as const,
+          reference: 'USAGE-AM-20260418-089',
+        },
+        {
+          id: 'TXN005',
+          type: 'top_up' as const,
+          division: 'Asset Management',
+          amount: 300000,
+          date: '2026-05-05',
+          status: 'pending' as const,
+          reference: 'TOPUP-AM-20260505-001',
+        },
+      ];
+
+      setTransactions(mockTransactions);
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error);
+      setTransactions([]);
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  // Load 10 most recent transactions on mount
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const handleSearch = () => {
+    // Update URL params
+    const params = new URLSearchParams();
+    if (searchTerm) params.set('search', searchTerm);
+    if (selectedDivisionFilter) params.set('division', selectedDivisionFilter);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    setSearchParams(params);
+
+    // Fetch data with current filters
+    fetchTransactions();
+    setCurrentPage(1);
+    setSelectedTransactions(new Set());
+  };
+
+  const handleClear = () => {
+    // Clear all filters
+    setSearchTerm('');
+    setSelectedDivisionFilter('');
+    setStartDate('');
+    setEndDate('');
+
+    // Clear URL params
+    setSearchParams(new URLSearchParams());
+
+    setCurrentPage(1);
+    setSelectedTransactions(new Set());
+
+    // Fetch 10 most recent transactions with cleared filters
+    fetchTransactions({ search: '', division: '', startDate: '', endDate: '' });
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', {
@@ -187,100 +264,22 @@ export function DashboardView({ userRole }: DashboardViewProps) {
     // In production, this would send the request to an API
     console.log('Top-up request submitted:', { amount, notes, division: dashboardData?.division });
 
-    // Get division name for the transaction
-    const divisionName = topUpDivision || getDivisionName() || 'General Insurance';
-    const divisionCode = divisionName === 'General Insurance' ? 'GI' : 'AM';
-    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
-
-    // Create new transaction
-    const newTransaction = {
-      id: `TXN${String(nextTxnId).padStart(3, '0')}`,
-      type: 'top_up' as const,
-      division: divisionName,
-      amount: amount,
-      date: new Date().toISOString().split('T')[0],
-      status: 'pending' as const,
-      reference: `TOPUP-${divisionCode}-${today}-${String(nextTxnId).padStart(3, '0')}`,
-    };
-
-    // Add transaction to the list
-    setAllTransactions(prev => [newTransaction, ...prev]);
-    setNextTxnId(prev => prev + 1);
-
     setToast({
       message: `Top-up request for KES ${amount.toLocaleString()} has been submitted successfully!`,
       type: 'success',
     });
+
+    // Refresh transactions after submitting top-up request
+    setTimeout(() => {
+      fetchTransactions();
+    }, 1000);
   };
 
-  // Automatically update pending top-up transactions to completed after 3 seconds
-  useEffect(() => {
-    const pendingTopUps = allTransactions.filter(
-      txn => txn.status === 'pending' && txn.type === 'top_up'
-    );
-
-    if (pendingTopUps.length === 0) return;
-
-    const timers = pendingTopUps.map(txn => {
-      return setTimeout(() => {
-        setAllTransactions(prev =>
-          prev.map(t =>
-            t.id === txn.id
-              ? { ...t, status: 'completed' as const }
-              : t
-          )
-        );
-
-        setToast({
-          message: `Top-up of ${formatCurrency(txn.amount)} for ${txn.division} has been approved and completed!`,
-          type: 'success',
-        });
-      }, 3000);
-    });
-
-    return () => {
-      timers.forEach(timer => clearTimeout(timer));
-    };
-  }, [allTransactions]);
-
-  // Filter transactions based on user role
-  let filteredTransactions = userRole === 'super_admin'
-    ? allTransactions
-    : allTransactions.filter(txn => txn.division === getDivisionName());
-
-  // Search filter
-  if (searchTerm) {
-    filteredTransactions = filteredTransactions.filter(txn =>
-      txn.reference.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }
-
-  // Division filter for super admin
-  if (userRole === 'super_admin' && selectedDivisionFilter) {
-    const divisionName = selectedDivisionFilter === 'general_insurance' ? 'General Insurance' : 'Asset Management';
-    filteredTransactions = filteredTransactions.filter(txn => txn.division === divisionName);
-  }
-
-  // Date filter
-  if (startDate) {
-    filteredTransactions = filteredTransactions.filter(txn => {
-      const txnDate = new Date(txn.date);
-      return txnDate >= new Date(startDate);
-    });
-  }
-
-  if (endDate) {
-    filteredTransactions = filteredTransactions.filter(txn => {
-      const txnDate = new Date(txn.date);
-      return txnDate <= new Date(endDate);
-    });
-  }
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  // Pagination calculations (filtering is done on backend)
+  const totalPages = Math.ceil(transactions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+  const paginatedTransactions = transactions.slice(startIndex, endIndex);
 
   // Selection handlers
   const toggleSelectAll = () => {
@@ -306,8 +305,8 @@ export function DashboardView({ userRole }: DashboardViewProps) {
 
   // Prepare data for export
   const dataToExport = selectedTransactions.size > 0
-    ? filteredTransactions.filter(txn => selectedTransactions.has(txn.id))
-    : filteredTransactions;
+    ? transactions.filter(txn => selectedTransactions.has(txn.id))
+    : transactions;
 
   const exportData = dataToExport.map(txn => ({
     'Reference': txn.reference,
@@ -324,13 +323,6 @@ export function DashboardView({ userRole }: DashboardViewProps) {
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-
-  // Reset to page 1 when filters change
-  const handleFilterChange = (callback: () => void) => {
-    callback();
-    setCurrentPage(1);
-    setSelectedTransactions(new Set());
   };
 
   // Loading state
@@ -526,7 +518,8 @@ export function DashboardView({ userRole }: DashboardViewProps) {
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => handleFilterChange(() => setSearchTerm(e.target.value))}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="Search by reference..."
                   className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
@@ -536,7 +529,7 @@ export function DashboardView({ userRole }: DashboardViewProps) {
                 <div className="relative min-w-[200px]">
                   <select
                     value={selectedDivisionFilter}
-                    onChange={(e) => handleFilterChange(() => setSelectedDivisionFilter(e.target.value))}
+                    onChange={(e) => setSelectedDivisionFilter(e.target.value)}
                     className="w-full h-10 px-3 pr-8 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
                   >
                     <option value="">All Divisions</option>
@@ -556,7 +549,7 @@ export function DashboardView({ userRole }: DashboardViewProps) {
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => handleFilterChange(() => setStartDate(e.target.value))}
+                  onChange={(e) => setStartDate(e.target.value)}
                   placeholder="Start Date"
                   className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
@@ -567,16 +560,40 @@ export function DashboardView({ userRole }: DashboardViewProps) {
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => handleFilterChange(() => setEndDate(e.target.value))}
+                  onChange={(e) => setEndDate(e.target.value)}
                   placeholder="End Date"
                   className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
+
+              <button
+                onClick={handleSearch}
+                className="flex items-center gap-2 px-4 py-2 bg-[#AFCB09] text-[#1a202c] rounded-lg hover:bg-[#9bb908] transition-colors font-medium text-sm h-10"
+              >
+                <Search className="w-4 h-4" />
+                Search
+              </button>
+              <button
+                onClick={handleClear}
+                className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg hover:bg-accent transition-colors font-medium text-sm text-foreground h-10"
+              >
+                <X className="w-4 h-4" />
+                Clear
+              </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          {isLoadingTransactions ? (
+            <div className="p-12">
+              <div className="flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                <p className="ml-3 text-muted-foreground">Loading transactions...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
               <thead className="bg-muted/50">
                 <tr>
                   <th className="px-6 py-3 w-12">
@@ -681,8 +698,8 @@ export function DashboardView({ userRole }: DashboardViewProps) {
             <div className="flex items-center gap-4">
               <p className="text-sm text-muted-foreground">
                 Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{' '}
-                <span className="font-medium text-foreground">{Math.min(endIndex, filteredTransactions.length)}</span> of{' '}
-                <span className="font-medium text-foreground">{filteredTransactions.length}</span> transactions
+                <span className="font-medium text-foreground">{Math.min(endIndex, transactions.length)}</span> of{' '}
+                <span className="font-medium text-foreground">{transactions.length}</span> transactions
               </p>
               <div className="flex items-center gap-2">
                 <label className="text-sm text-muted-foreground">Rows per page:</label>
@@ -751,6 +768,8 @@ export function DashboardView({ userRole }: DashboardViewProps) {
               </button>
             </div>
           </div>
+          </>
+          )}
         </div>
       )}
 

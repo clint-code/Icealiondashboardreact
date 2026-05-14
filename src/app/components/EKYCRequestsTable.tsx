@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Eye, Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Search, Eye, Calendar, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
 import { ExportButton } from './ExportButton';
 
 interface EKYCRequest {
@@ -19,34 +19,51 @@ interface EKYCRequestsTableProps {
 
 export function EKYCRequestsTable({ userRole }: EKYCRequestsTableProps) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [requests, setRequests] = useState<EKYCRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDivision, setSelectedDivision] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+
+  // Initialize filters from URL params
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [selectedDivision, setSelectedDivision] = useState(searchParams.get('division') || '');
+  const [startDate, setStartDate] = useState(searchParams.get('startDate') || '');
+  const [endDate, setEndDate] = useState(searchParams.get('endDate') || '');
 
   // Fetch E-KYC requests from API
-  useEffect(() => {
-    const fetchRequests = async () => {
-      setIsLoading(true);
-      setError(null);
+  const fetchRequests = async (filters?: { search?: string; division?: string; startDate?: string; endDate?: string }) => {
+    setIsLoading(true);
+    setError(null);
 
-      try {
-        // In production, replace this with actual API call:
-        // const response = await fetch(`/api/ekyc-requests?role=${userRole}`);
-        // const data = await response.json();
-        // setRequests(data.requests);
+    // Use provided filters or fall back to state
+    const search = filters?.search !== undefined ? filters.search : searchTerm;
+    const division = filters?.division !== undefined ? filters.division : selectedDivision;
+    const start = filters?.startDate !== undefined ? filters.startDate : startDate;
+    const end = filters?.endDate !== undefined ? filters.endDate : endDate;
 
-        // Mock API call with timeout
-        await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      // Build query params for API call
+      const params = new URLSearchParams();
+      params.append('role', userRole);
+      if (search) params.append('search', search);
+      if (division) params.append('division', division);
+      if (start) params.append('startDate', start);
+      if (end) params.append('endDate', end);
 
-        // Mock data
-        const mockRequests: EKYCRequest[] = [
+      // In production, replace this with actual API call:
+      // const response = await fetch(`/api/ekyc-requests?${params.toString()}`);
+      // const data = await response.json();
+      // setRequests(data.requests);
+
+      // Mock API call with timeout
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Mock data
+      const mockRequests: EKYCRequest[] = [
           {
             id: '64794',
             createdAt: '06/05/2026 13:39:30',
@@ -121,57 +138,56 @@ export function EKYCRequestsTable({ userRole }: EKYCRequestsTableProps) {
           },
         ];
 
-        setRequests(mockRequests);
-      } catch (err) {
-        setError('Failed to load E-KYC requests. Please try again.');
-        console.error('Error fetching E-KYC requests:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      setRequests(mockRequests);
+    } catch (err) {
+      setError('Failed to load E-KYC requests. Please try again.');
+      console.error('Error fetching E-KYC requests:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  // Load 10 most recent records on mount
+  useEffect(() => {
     fetchRequests();
-  }, [userRole]);
+  }, []);
 
-  // Apply filters
-  let filteredRequests = userRole === 'super_admin'
-    ? requests
-    : requests.filter(req => req.division === userRole);
+  const handleSearch = () => {
+    // Update URL params
+    const params = new URLSearchParams();
+    if (searchTerm) params.set('search', searchTerm);
+    if (selectedDivision) params.set('division', selectedDivision);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    setSearchParams(params);
 
-  // Search filter
-  if (searchTerm) {
-    filteredRequests = filteredRequests.filter(req =>
-      req.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.searchData.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }
+    // Reset to first page
+    setCurrentPage(1);
+    setSelectedRows(new Set());
 
-  // Division filter (super admin only)
-  if (selectedDivision) {
-    filteredRequests = filteredRequests.filter(req => req.division === selectedDivision);
-  }
+    // Fetch data
+    fetchRequests();
+  };
 
-  // Date filter
-  if (startDate) {
-    filteredRequests = filteredRequests.filter(req => {
-      const reqDate = new Date(req.createdAt.split(' ')[0].split('/').reverse().join('-'));
-      return reqDate >= new Date(startDate);
-    });
-  }
+  const handleClear = () => {
+    // Clear all filters
+    setSearchTerm('');
+    setSelectedDivision('');
+    setStartDate('');
+    setEndDate('');
+    setSearchParams(new URLSearchParams());
+    setCurrentPage(1);
+    setSelectedRows(new Set());
 
-  if (endDate) {
-    filteredRequests = filteredRequests.filter(req => {
-      const reqDate = new Date(req.createdAt.split(' ')[0].split('/').reverse().join('-'));
-      return reqDate <= new Date(endDate);
-    });
-  }
+    // Fetch 10 most recent records with cleared filters
+    fetchRequests({ search: '', division: '', startDate: '', endDate: '' });
+  };
 
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  // Pagination calculations (filtering is done on backend)
+  const totalPages = Math.ceil(requests.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
+  const paginatedRequests = requests.slice(startIndex, endIndex);
 
   // Selection handlers
   const toggleSelectAll = () => {
@@ -197,8 +213,8 @@ export function EKYCRequestsTable({ userRole }: EKYCRequestsTableProps) {
 
   // Prepare data for export
   const dataToExport = selectedRows.size > 0
-    ? filteredRequests.filter(req => selectedRows.has(req.id))
-    : filteredRequests;
+    ? requests.filter(req => selectedRows.has(req.id))
+    : requests;
 
   const exportData = dataToExport.map(req => ({
     'ID': req.id,
@@ -214,15 +230,7 @@ export function EKYCRequestsTable({ userRole }: EKYCRequestsTableProps) {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
 
-  // Reset to page 1 when filters change
-  const handleFilterChange = (callback: () => void) => {
-    callback();
-    setCurrentPage(1);
-    setSelectedRows(new Set());
-  };
-
   // Helper function for status colors
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -290,7 +298,8 @@ export function EKYCRequestsTable({ userRole }: EKYCRequestsTableProps) {
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => handleFilterChange(() => setSearchTerm(e.target.value))}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="Search by ID, reference, or search data..."
               className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
@@ -300,7 +309,7 @@ export function EKYCRequestsTable({ userRole }: EKYCRequestsTableProps) {
             <div className="relative min-w-[200px]">
               <select
                 value={selectedDivision}
-                onChange={(e) => handleFilterChange(() => setSelectedDivision(e.target.value))}
+                onChange={(e) => setSelectedDivision(e.target.value)}
                 className="w-full h-10 px-3 pr-8 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
               >
                 <option value="">All Divisions</option>
@@ -320,7 +329,7 @@ export function EKYCRequestsTable({ userRole }: EKYCRequestsTableProps) {
             <input
               type="date"
               value={startDate}
-              onChange={(e) => handleFilterChange(() => setStartDate(e.target.value))}
+              onChange={(e) => setStartDate(e.target.value)}
               placeholder="Start Date"
               className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
@@ -331,11 +340,26 @@ export function EKYCRequestsTable({ userRole }: EKYCRequestsTableProps) {
             <input
               type="date"
               value={endDate}
-              onChange={(e) => handleFilterChange(() => setEndDate(e.target.value))}
+              onChange={(e) => setEndDate(e.target.value)}
               placeholder="End Date"
               className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
+
+          <button
+            onClick={handleSearch}
+            className="flex items-center gap-2 px-4 py-2 bg-[#AFCB09] text-[#1a202c] rounded-lg hover:bg-[#9bb908] transition-colors font-medium text-sm h-10"
+          >
+            <Search className="w-4 h-4" />
+            Search
+          </button>
+          <button
+            onClick={handleClear}
+            className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg hover:bg-accent transition-colors font-medium text-sm text-foreground h-10"
+          >
+            <X className="w-4 h-4" />
+            Clear
+          </button>
         </div>
       </div>
 
@@ -444,9 +468,9 @@ export function EKYCRequestsTable({ userRole }: EKYCRequestsTableProps) {
       <div className="p-4 border-t border-border flex items-center justify-between">
         <div className="flex items-center gap-4">
           <p className="text-sm text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{' '}
-            <span className="font-medium text-foreground">{Math.min(endIndex, filteredRequests.length)}</span> of{' '}
-            <span className="font-medium text-foreground">{filteredRequests.length}</span> requests
+            Showing <span className="font-medium text-foreground">{requests.length > 0 ? startIndex + 1 : 0}</span> to{' '}
+            <span className="font-medium text-foreground">{Math.min(endIndex, requests.length)}</span> of{' '}
+            <span className="font-medium text-foreground">{requests.length}</span> requests
           </p>
           <div className="flex items-center gap-2">
             <label className="text-sm text-muted-foreground">Rows per page:</label>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Wallet, TrendingUp, Plus, ArrowUpCircle, Search, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Wallet, TrendingUp, Plus, ArrowUpCircle, Search, Calendar, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-react';
 import { ExportButton } from './ExportButton';
 import { RequestTopUpModal } from './RequestTopUpModal';
 import { Toast } from './Toast';
@@ -16,16 +17,19 @@ interface AccountBillingProps {
 }
 
 export function AccountBilling({ userRole }: AccountBillingProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDivision, setSelectedDivision] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [selectedDivision, setSelectedDivision] = useState(searchParams.get('division') || '');
+  const [startDate, setStartDate] = useState(searchParams.get('startDate') || '');
+  const [endDate, setEndDate] = useState(searchParams.get('endDate') || '');
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
   const [topUpDivision, setTopUpDivision] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const generalInsuranceAccount: AccountData = {
     division: 'General Insurance',
     accountBalance: 850000,
@@ -60,94 +64,132 @@ export function AccountBilling({ userRole }: AccountBillingProps) {
 
   const accounts = getAccountsToDisplay();
 
-  const transactionHistory = [
-    {
-      id: 'TXN001',
-      type: 'top_up',
-      division: 'General Insurance',
-      amount: 500000,
-      date: '2026-04-15',
-      status: 'completed',
-      reference: 'TOPUP-GI-20260415-001',
-    },
-    {
-      id: 'TXN002',
-      type: 'usage',
-      division: 'General Insurance',
-      amount: -45000,
-      date: '2026-04-20',
-      status: 'completed',
-      reference: 'USAGE-GI-20260420-142',
-    },
-    {
-      id: 'TXN003',
-      type: 'top_up',
-      division: 'Asset Management',
-      amount: 400000,
-      date: '2026-04-10',
-      status: 'completed',
-      reference: 'TOPUP-AM-20260410-001',
-    },
-    {
-      id: 'TXN004',
-      type: 'usage',
-      division: 'Asset Management',
-      amount: -32000,
-      date: '2026-04-18',
-      status: 'completed',
-      reference: 'USAGE-AM-20260418-089',
-    },
-    {
-      id: 'TXN005',
-      type: 'top_up',
-      division: 'Asset Management',
-      amount: 300000,
-      date: '2026-05-05',
-      status: 'pending',
-      reference: 'TOPUP-AM-20260505-001',
-    },
-  ];
+  const fetchTransactions = async (filters?: { search?: string; division?: string; startDate?: string; endDate?: string }) => {
+    setIsLoading(true);
 
-  // Apply filters
-  let filteredTransactions = userRole === 'super_admin'
-    ? transactionHistory
-    : transactionHistory.filter(txn =>
-        txn.division === (userRole === 'general_insurance' ? 'General Insurance' : 'Asset Management')
-      );
+    // Use provided filters or fall back to state
+    const search = filters?.search !== undefined ? filters.search : searchTerm;
+    const division = filters?.division !== undefined ? filters.division : selectedDivision;
+    const start = filters?.startDate !== undefined ? filters.startDate : startDate;
+    const end = filters?.endDate !== undefined ? filters.endDate : endDate;
 
-  // Search filter
-  if (searchTerm) {
-    filteredTransactions = filteredTransactions.filter(txn =>
-      txn.reference.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }
+    try {
+      // Build query params for API call
+      const params = new URLSearchParams();
+      params.append('role', userRole);
+      if (search) params.append('search', search);
+      if (division) params.append('division', division);
+      if (start) params.append('startDate', start);
+      if (end) params.append('endDate', end);
 
-  // Division filter (super admin only)
-  if (selectedDivision) {
-    const divisionName = selectedDivision === 'general_insurance' ? 'General Insurance' : 'Asset Management';
-    filteredTransactions = filteredTransactions.filter(txn => txn.division === divisionName);
-  }
+      // In production, replace this with actual API call:
+      // const response = await fetch(`/api/transactions?${params.toString()}`);
+      // const data = await response.json();
+      // setTransactions(data.transactions);
 
-  // Date filter
-  if (startDate) {
-    filteredTransactions = filteredTransactions.filter(txn => {
-      const txnDate = new Date(txn.date);
-      return txnDate >= new Date(startDate);
-    });
-  }
+      // Mock API call with timeout
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-  if (endDate) {
-    filteredTransactions = filteredTransactions.filter(txn => {
-      const txnDate = new Date(txn.date);
-      return txnDate <= new Date(endDate);
-    });
-  }
+      // Mock data - in production this comes from API
+      const mockTransactions = [
+        {
+          id: 'TXN001',
+          type: 'top_up',
+          division: 'General Insurance',
+          amount: 500000,
+          date: '2026-04-15',
+          status: 'completed',
+          reference: 'TOPUP-GI-20260415-001',
+        },
+        {
+          id: 'TXN002',
+          type: 'usage',
+          division: 'General Insurance',
+          amount: -45000,
+          date: '2026-04-20',
+          status: 'completed',
+          reference: 'USAGE-GI-20260420-142',
+        },
+        {
+          id: 'TXN003',
+          type: 'top_up',
+          division: 'Asset Management',
+          amount: 400000,
+          date: '2026-04-10',
+          status: 'completed',
+          reference: 'TOPUP-AM-20260410-001',
+        },
+        {
+          id: 'TXN004',
+          type: 'usage',
+          division: 'Asset Management',
+          amount: -32000,
+          date: '2026-04-18',
+          status: 'completed',
+          reference: 'USAGE-AM-20260418-089',
+        },
+        {
+          id: 'TXN005',
+          type: 'top_up',
+          division: 'Asset Management',
+          amount: 300000,
+          date: '2026-05-05',
+          status: 'pending',
+          reference: 'TOPUP-AM-20260505-001',
+        },
+      ];
+
+      setTransactions(mockTransactions);
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error);
+      setTransactions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearch = () => {
+    // Update URL params
+    const params = new URLSearchParams();
+    if (searchTerm) params.set('search', searchTerm);
+    if (selectedDivision) params.set('division', selectedDivision);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    setSearchParams(params);
+
+    // Fetch data with current filters
+    fetchTransactions();
+    setCurrentPage(1);
+    setSelectedTransactions(new Set());
+  };
+
+  const handleClear = () => {
+    // Clear all filters
+    setSearchTerm('');
+    setSelectedDivision('');
+    setStartDate('');
+    setEndDate('');
+
+    // Clear URL params
+    setSearchParams(new URLSearchParams());
+
+    setCurrentPage(1);
+    setSelectedTransactions(new Set());
+
+    // Fetch 10 most recent transactions with cleared filters
+    fetchTransactions({ search: '', division: '', startDate: '', endDate: '' });
+  };
+
+  // Load 10 most recent transactions on mount
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const totalPages = Math.ceil(transactions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+  const paginatedTransactions = transactions.slice(startIndex, endIndex);
 
   // Selection handlers
   const toggleSelectAll = () => {
@@ -173,8 +215,8 @@ export function AccountBilling({ userRole }: AccountBillingProps) {
 
   // Prepare data for export
   const dataToExport = selectedTransactions.size > 0
-    ? filteredTransactions.filter(txn => selectedTransactions.has(txn.id))
-    : filteredTransactions;
+    ? transactions.filter(txn => selectedTransactions.has(txn.id))
+    : transactions;
 
   const exportData = dataToExport.map(txn => ({
     'Reference': txn.reference,
@@ -191,13 +233,6 @@ export function AccountBilling({ userRole }: AccountBillingProps) {
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-  };
-
-  // Reset to page 1 when filters change
-  const handleFilterChange = (callback: () => void) => {
-    callback();
-    setCurrentPage(1);
-    setSelectedTransactions(new Set());
   };
 
   const handleOpenTopUpModal = (division?: string) => {
@@ -321,23 +356,24 @@ export function AccountBilling({ userRole }: AccountBillingProps) {
             </div>
           </div>
 
-          {userRole === 'super_admin' && (
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-[250px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => handleFilterChange(() => setSearchTerm(e.target.value))}
-                  placeholder="Search by reference..."
-                  className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[250px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="Search by reference..."
+                className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
 
+            {userRole === 'super_admin' && (
               <div className="relative min-w-[200px]">
                 <select
                   value={selectedDivision}
-                  onChange={(e) => handleFilterChange(() => setSelectedDivision(e.target.value))}
+                  onChange={(e) => setSelectedDivision(e.target.value)}
                   className="w-full h-10 px-3 pr-8 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
                 >
                   <option value="">All Divisions</option>
@@ -350,34 +386,58 @@ export function AccountBilling({ userRole }: AccountBillingProps) {
                   </svg>
                 </div>
               </div>
+            )}
 
-              <div className="relative min-w-[160px]">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => handleFilterChange(() => setStartDate(e.target.value))}
-                  placeholder="Start Date"
-                  className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              <div className="relative min-w-[160px]">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => handleFilterChange(() => setEndDate(e.target.value))}
-                  placeholder="End Date"
-                  className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
+            <div className="relative min-w-[160px]">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                placeholder="Start Date"
+                className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
             </div>
-          )}
+
+            <div className="relative min-w-[160px]">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                placeholder="End Date"
+                className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+
+            <button
+              onClick={handleSearch}
+              className="flex items-center gap-2 px-4 py-2 bg-[#AFCB09] text-[#1a202c] rounded-lg hover:bg-[#9bb908] transition-colors font-medium text-sm h-10"
+            >
+              <Search className="w-4 h-4" />
+              Search
+            </button>
+            <button
+              onClick={handleClear}
+              className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg hover:bg-accent transition-colors font-medium text-sm text-foreground h-10"
+            >
+              <X className="w-4 h-4" />
+              Clear
+            </button>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        {isLoading ? (
+          <div className="p-12">
+            <div className="flex items-center justify-center">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <p className="ml-3 text-muted-foreground">Loading transactions...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
             <thead className="bg-muted/50">
               <tr>
                 <th className="px-6 py-3 w-12">
@@ -482,8 +542,8 @@ export function AccountBilling({ userRole }: AccountBillingProps) {
           <div className="flex items-center gap-4">
             <p className="text-sm text-muted-foreground">
               Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{' '}
-              <span className="font-medium text-foreground">{Math.min(endIndex, filteredTransactions.length)}</span> of{' '}
-              <span className="font-medium text-foreground">{filteredTransactions.length}</span> transactions
+              <span className="font-medium text-foreground">{Math.min(endIndex, transactions.length)}</span> of{' '}
+              <span className="font-medium text-foreground">{transactions.length}</span> transactions
             </p>
             <div className="flex items-center gap-2">
               <label className="text-sm text-muted-foreground">Rows per page:</label>
@@ -552,6 +612,8 @@ export function AccountBilling({ userRole }: AccountBillingProps) {
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Top-Up Information Card */}

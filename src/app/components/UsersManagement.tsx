@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Edit, Trash2, Shield, ChevronLeft, ChevronRight, MoreVertical, Key } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, Plus, Edit, Trash2, Shield, ChevronLeft, ChevronRight, MoreVertical, Key, X, Loader2 } from 'lucide-react';
 import { ExportButton } from './ExportButton';
 import { AddUserModal, NewUser } from './AddUserModal';
 import { EditUserModal } from './EditUserModal';
@@ -17,12 +18,13 @@ interface User {
 }
 
 export function UsersManagement() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [roleFilter, setRoleFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>((searchParams.get('status') as 'all' | 'active' | 'inactive') || 'all');
+  const [roleFilter, setRoleFilter] = useState(searchParams.get('role') || '');
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -34,6 +36,7 @@ export function UsersManagement() {
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [users, setUsers] = useState<User[]>([
     {
@@ -73,6 +76,107 @@ export function UsersManagement() {
       lastActive: '2 days ago',
     },
   ]);
+
+  const fetchUsers = async (filters?: { search?: string; status?: string; role?: string }) => {
+    setIsLoading(true);
+
+    // Use provided filters or fall back to state
+    const search = filters?.search !== undefined ? filters.search : searchTerm;
+    const status = filters?.status !== undefined ? filters.status : statusFilter;
+    const role = filters?.role !== undefined ? filters.role : roleFilter;
+
+    try {
+      // Build query params for API call
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (status !== 'all') params.append('status', status);
+      if (role) params.append('role', role);
+
+      // In production, replace this with actual API call:
+      // const response = await fetch(`/api/users?${params.toString()}`);
+      // const data = await response.json();
+      // setUsers(data.users);
+
+      // Mock API call with timeout
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Mock data - in production this comes from API
+      const mockUsers: User[] = [
+        {
+          id: 'U001',
+          name: 'John Kamau',
+          email: 'john.kamau@icealion.co.ke',
+          role: 'super_admin',
+          division: 'All Divisions',
+          status: 'active',
+          lastActive: '2 mins ago',
+        },
+        {
+          id: 'U002',
+          name: 'Mary Wanjiru',
+          email: 'mary.wanjiru@icealion.co.ke',
+          role: 'general_insurance',
+          division: 'General Insurance',
+          status: 'active',
+          lastActive: '1 hour ago',
+        },
+        {
+          id: 'U003',
+          name: 'Peter Ochieng',
+          email: 'peter.ochieng@icealion.co.ke',
+          role: 'asset_management',
+          division: 'Asset Management',
+          status: 'active',
+          lastActive: '3 hours ago',
+        },
+        {
+          id: 'U004',
+          name: 'Grace Akinyi',
+          email: 'grace.akinyi@icealion.co.ke',
+          role: 'general_insurance',
+          division: 'General Insurance',
+          status: 'inactive',
+          lastActive: '2 days ago',
+        },
+      ];
+
+      setUsers(mockUsers);
+    } catch (error) {
+      setToastMessage('Failed to load users');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load 10 most recent users on mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleSearch = () => {
+    const params = new URLSearchParams();
+    if (searchTerm) params.set('search', searchTerm);
+    if (statusFilter !== 'all') params.set('status', statusFilter);
+    if (roleFilter) params.set('role', roleFilter);
+    setSearchParams(params);
+    setCurrentPage(1);
+    setSelectedUsers(new Set());
+    fetchUsers();
+  };
+
+  const handleClear = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setRoleFilter('');
+    setSearchParams(new URLSearchParams());
+    setCurrentPage(1);
+    setSelectedUsers(new Set());
+
+    // Fetch 10 most recent users with cleared filters
+    fetchUsers({ search: '', status: 'all', role: '' });
+  };
 
   const handleAddUser = (newUser: NewUser) => {
     // Generate new user ID
@@ -199,33 +303,11 @@ export function UsersManagement() {
     }
   };
 
-  // Apply filters
-  let filteredUsers = users;
-
-  // Search filter
-  if (searchTerm) {
-    filteredUsers = filteredUsers.filter(user =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }
-
-  // Status filter
-  if (statusFilter !== 'all') {
-    filteredUsers = filteredUsers.filter(user => user.status === statusFilter);
-  }
-
-  // Role filter
-  if (roleFilter) {
-    filteredUsers = filteredUsers.filter(user => user.role === roleFilter);
-  }
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  // Pagination calculations (filtering is done on backend)
+  const totalPages = Math.ceil(users.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+  const paginatedUsers = users.slice(startIndex, endIndex);
 
   // Selection handlers
   const toggleSelectAll = () => {
@@ -251,8 +333,8 @@ export function UsersManagement() {
 
   // Prepare data for export
   const dataToExport = selectedUsers.size > 0
-    ? filteredUsers.filter(user => selectedUsers.has(user.id))
-    : filteredUsers;
+    ? users.filter(user => selectedUsers.has(user.id))
+    : users;
 
   const exportData = dataToExport.map(user => ({
     'ID': user.id,
@@ -268,13 +350,6 @@ export function UsersManagement() {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)));
   };
 
-  // Reset to page 1 when filters change
-  const handleFilterChange = (callback: () => void) => {
-    callback();
-    setCurrentPage(1);
-    setSelectedUsers(new Set());
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -285,87 +360,113 @@ export function UsersManagement() {
       </div>
 
       <div className="bg-white rounded-lg border border-border">
-        <div className="p-6 border-b border-border">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 min-w-[250px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => handleFilterChange(() => setSearchTerm(e.target.value))}
-                  placeholder="Search users by name, email, or ID..."
-                  className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
+        {isLoading ? (
+          <div className="p-12">
+            <div className="flex items-center justify-center">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <p className="ml-3 text-muted-foreground">Loading users...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="p-6 border-b border-border">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="relative flex-1 min-w-[250px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      placeholder="Search users by name, email, or ID..."
+                      className="w-full h-10 pl-10 pr-4 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
 
-              <div className="relative min-w-[180px]">
-                <select
-                  value={roleFilter}
-                  onChange={(e) => handleFilterChange(() => setRoleFilter(e.target.value))}
-                  className="w-full h-10 px-3 pr-8 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
-                >
-                  <option value="">All Roles</option>
-                  <option value="super_admin">Super Admin</option>
-                  <option value="general_insurance">General Insurance</option>
-                  <option value="asset_management">Asset Management</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <div className="relative min-w-[180px]">
+                    <select
+                      value={roleFilter}
+                      onChange={(e) => setRoleFilter(e.target.value)}
+                      className="w-full h-10 px-3 pr-8 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
+                    >
+                      <option value="">All Roles</option>
+                      <option value="super_admin">Super Admin</option>
+                      <option value="general_insurance">General Insurance</option>
+                      <option value="asset_management">Asset Management</option>
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div className="relative min-w-[140px]">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                      className="w-full h-10 px-3 pr-8 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSearch}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#AFCB09] text-[#1a202c] rounded-lg hover:bg-[#9bb908] transition-colors font-medium text-sm h-10"
+                  >
+                    <Search className="w-4 h-4" />
+                    Search
+                  </button>
+                  <button
+                    onClick={handleClear}
+                    className="flex items-center gap-2 px-4 py-2 border border-input rounded-lg hover:bg-accent transition-colors font-medium text-sm text-foreground h-10"
+                  >
+                    <X className="w-4 h-4" />
+                    Clear
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3 ml-4">
+                  {selectedUsers.size > 0 && (
+                    <span className="text-sm text-muted-foreground">
+                      {selectedUsers.size} selected
+                    </span>
+                  )}
+                  <ExportButton
+                    data={exportData}
+                    filename={`users-${new Date().toISOString().split('T')[0]}`}
+                    variant="secondary"
+                  />
+                  <button
+                    onClick={() => setIsAddUserModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#AFCB09] text-[#1a202c] rounded-lg hover:bg-[#9bb908] transition-colors shadow-md font-medium"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add User
+                  </button>
                 </div>
               </div>
 
-              <div className="relative min-w-[140px]">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => handleFilterChange(() => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive'))}
-                  className="w-full h-10 px-3 pr-8 rounded-lg border border-input bg-input-background text-sm focus:outline-none focus:ring-2 focus:ring-ring appearance-none cursor-pointer"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-success rounded-full"></div>
+                  <span className="text-sm text-muted-foreground">Active: {users.filter(u => u.status === 'active').length}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-muted rounded-full"></div>
+                  <span className="text-sm text-muted-foreground">Inactive: {users.filter(u => u.status === 'inactive').length}</span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {selectedUsers.size > 0 && (
-                <span className="text-sm text-muted-foreground">
-                  {selectedUsers.size} selected
-                </span>
-              )}
-              <ExportButton
-                data={exportData}
-                filename={`users-${new Date().toISOString().split('T')[0]}`}
-                variant="secondary"
-              />
-              <button
-                onClick={() => setIsAddUserModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-[#AFCB09] text-[#1a202c] rounded-lg hover:bg-[#9bb908] transition-colors shadow-md font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                Add User
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-success rounded-full"></div>
-              <span className="text-sm text-muted-foreground">Active: {filteredUsers.filter(u => u.status === 'active').length}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-muted rounded-full"></div>
-              <span className="text-sm text-muted-foreground">Inactive: {filteredUsers.filter(u => u.status === 'inactive').length}</span>
-            </div>
-          </div>
-        </div>
 
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -513,8 +614,8 @@ export function UsersManagement() {
           <div className="flex items-center gap-4">
             <p className="text-sm text-muted-foreground">
               Showing <span className="font-medium text-foreground">{startIndex + 1}</span> to{' '}
-              <span className="font-medium text-foreground">{Math.min(endIndex, filteredUsers.length)}</span> of{' '}
-              <span className="font-medium text-foreground">{filteredUsers.length}</span> users
+              <span className="font-medium text-foreground">{Math.min(endIndex, users.length)}</span> of{' '}
+              <span className="font-medium text-foreground">{users.length}</span> users
             </p>
             <div className="flex items-center gap-2">
               <label className="text-sm text-muted-foreground">Rows per page:</label>
@@ -583,6 +684,8 @@ export function UsersManagement() {
             </button>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Add User Modal */}

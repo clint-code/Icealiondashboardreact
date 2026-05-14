@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './components/LoginPage';
 import { ResetPasswordPage } from './components/ResetPasswordPage';
+import { VerificationCodePage } from './pages/VerificationCodePage';
 import { DashboardLayout } from './components/DashboardLayout';
 import { DashboardView } from './components/DashboardView';
 import { EKYCRequestsTable } from './components/EKYCRequestsTable';
@@ -50,6 +51,17 @@ export function AppRoutes({
             onCancel={() => window.location.href = '/login'}
             onSuccess={() => window.location.href = '/login'}
           />
+        }
+      />
+
+      <Route
+        path="/verification"
+        element={
+          isAuthenticated ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <VerificationCodePage onLogin={onLogin} />
+          )
         }
       />
 
